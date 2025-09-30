@@ -1,0 +1,1 @@
+For the benchmarking the code for each stage was modified so that at it called ´start_resource_monitor´ at the start and ´stop_resource_monitor´ at the end.

@@ -1,0 +1,31 @@
+# 02-Initial
+evaluation:
+  metrics: {'rmse': False}
+  save_top_models: 0.1
+  score_with: 'rmse'
+
+split:
+  types: [KFold]
+  seed: 42
+  n_splits: 5
+  test_size: 0.20
+
+gridsearch:
+  RandomForestRegressor:
+    module: sklearn.ensemble
+    class: RandomForestRegressor
+    parameters:
+      random_state: 42
+    hyperparameters:
+      n_estimators: [10, 50, 100, 250, 400]
+      max_depth: [5, 10, 30, 50, 150, 200, null]
+
+  KNeighborsRegressor:
+    module: sklearn.neighbors
+    class: KNeighborsRegressor
+    hyperparameters:
+      n_neighbors: [3, 5, 10]
+      weights: [uniform, distance]
+      p: [1, 2]
+      leaf_size: [10, 15, 30]
+      metric: [minkowski, euclidean]

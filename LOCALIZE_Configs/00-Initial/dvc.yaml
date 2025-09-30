@@ -1,0 +1,77 @@
+# 00-Initial
+vars:
+  - path:
+      # Path are relative to location of dvc.yaml file
+      scripts: ../../src/umu
+      common: ../../src
+      data: ../../artifacts/00-Initial/data
+      models: ../../artifacts/00-Initial/models
+      reports: ../../artifacts/00-Initial/reports
+
+
+stages:
+  prepare:
+    desc: Prepare UMU dataset for the MLOps pipeline
+    cmd: |
+      unzip ${path.data}/raw/umu.zip -d ${path.data}/raw/
+      python ${path.scripts}/prepare.py --method average --input ${path.data}/raw/umu/tcp_nokia_20240325.xlsx --output ${path.data}/interim/umu.pkl
+      rm ${path.data}/raw/umu/*.xlsx
+      rm ${path.data}/raw/__MACOSX/umu/.*.xlsx
+    deps:
+      - ${path.scripts}/prepare.py
+      - ${path.data}/raw/umu.zip
+    outs:
+      - ${path.data}/interim/umu.pkl
+
+  featurize:
+    desc: Enrich dataset with additional features
+    cmd: >
+      python ${path.scripts}/featurize.py
+      --input ${path.data}/interim/umu.pkl
+      --output ${path.data}/prepared/umu.pkl
+    deps:
+      - ${path.scripts}/featurize.py
+      - ${path.data}/interim/umu.pkl
+    outs:
+      - ${path.data}/prepared/umu.pkl
+
+
+  split:
+    desc: Split dataset and store indices
+    matrix:
+      split: ${split.types}
+    cmd: >
+      python ${path.scripts}/split.py
+      --input ${path.data}/prepared/umu.pkl
+      --split ${item.split}
+      --output-indices ${path.data}/splits/${item.split}Split.pkl
+    params:
+      - split
+    deps:
+      - ${path.scripts}/split.py
+      - ${path.data}/prepared/umu.pkl
+    outs:
+      - ${path.data}/splits/${item.split}Split.pkl
+
+
+  gridsearch:
+    desc: Determine best hyper-parameters for algorithm on several CVs
+    matrix:
+      split: ${split.types}
+      model: ${gridsearch}
+    cmd: >
+      python ${path.common}/benchmark.py
+      --use ${item.model}
+      --optimizer gridsearch
+      --data ${path.data}/prepared/umu.pkl
+      --split-indices ${path.data}/splits/${item.split}Split.pkl
+      --output-results ${path.models}/gridsearch-${item.split}-${item.model}/${item.model}-${item.split}Split-results.pkl
+    params:
+      - gridsearch.${item.model}
+    deps:
+      - ${path.common}/benchmark.py
+      - ${path.data}/prepared/umu.pkl
+      - ${path.data}/splits/${item.split}Split.pkl
+    outs:
+      - ${path.models}/gridsearch-${item.split}-${item.model}/${item.model}-${item.split}Split-results.pkl
+
