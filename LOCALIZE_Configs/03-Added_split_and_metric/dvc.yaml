@@ -1,0 +1,79 @@
+# 03-Initial
+vars:
+  - path:
+      # Path are relative to location of dvc.yaml file
+      scripts: ../../src/logatec
+      common: ../../src
+      data: ../../artifacts/03-Added_split_and_metric/data
+      models: ../../artifacts/03-Added_split_and_metric/models
+      reports: ../../artifacts/03-Added_split_and_metric/reports
+
+  - subsets: [winter, spring]
+
+stages:
+  prepare:
+    desc: Download, unzip, and convert dataset to pickle format
+    matrix:
+      subset: ${subsets}
+    cmd: |
+      unzip -j ${path.data}/raw/logatec.zip ${item.subset}_data.json -d ${path.data}/raw/
+      python ${path.scripts}/prepare.py --method average --input ${path.data}/raw/${item.subset}_data.json --output ${path.data}/interim/${item.subset}.pkl
+      rm ${path.data}/raw/${item.subset}_data.json
+    deps:
+      - ${path.scripts}/prepare.py
+      - ${path.data}/raw/logatec.zip
+    outs:
+      - ${path.data}/interim/${item.subset}.pkl
+
+  featurize:
+    desc: Enrich dataset with additional features
+    matrix:
+      subset: ${subsets}
+    cmd: >
+      python ${path.scripts}/featurize.py
+      --input ${path.data}/interim/${item.subset}.pkl
+      --output ${path.data}/prepared/${item.subset}.pkl
+    deps:
+      - ${path.scripts}/featurize.py
+      - ${path.data}/interim/${item.subset}.pkl
+    outs:
+      - ${path.data}/prepared/${item.subset}.pkl
+
+
+  split:
+    desc: Prepare train-test split indices for model training and evaluation
+    matrix:
+      subset: ${subsets}
+      split: ${split.types}
+    cmd: >
+      python ${path.scripts}/split.py
+      --input ${path.data}/prepared/${item.subset}.pkl
+      --split ${item.split}
+      --output-indices ${path.data}/splits/${item.subset}-${item.split}Split.pkl
+    deps:
+      - ${path.scripts}/split.py
+      - ${path.data}/prepared/${item.subset}.pkl
+    outs:
+      - ${path.data}/splits/${item.subset}-${item.split}Split.pkl
+
+
+  gridsearch:
+    desc: Determine best hyper-parameters for algorithm on several CVs
+    matrix:
+      subset: ${subsets}
+      split: ${split.types}
+      model: ${gridsearch}
+    cmd: >
+      python ${path.common}/benchmark.py
+      --use ${item.model}
+      --optimizer gridsearch
+      --data ${path.data}/prepared/${item.subset}.pkl
+      --split-indices ${path.data}/splits/${item.subset}-${item.split}Split.pkl
+      --output-results ${path.models}/gridsearch-${item.subset}-${item.split}-${item.model}/${item.subset}-${item.model}-${item.split}Split-results.pkl
+    deps:
+      - ${path.common}/benchmark.py
+      - ${path.data}/prepared/${item.subset}.pkl
+      - ${path.data}/splits/${item.subset}-${item.split}Split.pkl
+    outs:
+      - ${path.models}/gridsearch-${item.subset}-${item.split}-${item.model}/${item.subset}-${item.model}-${item.split}Split-results.pkl
+
