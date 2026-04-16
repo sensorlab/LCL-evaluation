@@ -1,0 +1,18 @@
+# 00-Initial
+evaluation:
+  metrics: {'rmse': False}
+  save_top_models: 0.1
+  score_with: 'rmse'
+
+split:
+  types: [KFold]
+  seed: 42
+  n_splits: 5
+  test_size: 0.20
+
+gridsearch:
+  LinearRegression:
+    module: sklearn.linear_model
+    class: LinearRegression
+    hyperparameters:
+      fit_intercept: [true, false]
